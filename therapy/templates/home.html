@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #1e1e1e;
+        color: #ffffff;
+    }
+
+    h2 {
+        text-align: center;
+        color: #ff9800;
+        margin-bottom: 30px;
+        font-size: 2rem;
+    }
+
+    p {
+        text-align: center;
+        color: #ffffff;
+        margin-bottom: 40px;
+        font-size: 1.2rem;
+    }
+
+    h3 {
+        color: #ff9800;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+        text-align: center;
+    }
+
+    .patient-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 30px;
+        padding: 20px;
+        justify-content: center;
+    }
+
+    .patient-card {
+        background: #333333;
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .patient-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .patient-card p {
+        font-size: 1rem;
+        margin: 8px 0;
+        color: #ffffff;
+    }
+
+    .patient-card p.name {
+        font-size: 1.3rem;
+        color: #ff9800;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .action-buttons a,
+    .action-buttons button {
+        color: #ffffff;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        text-align: center;
+        transition: background-color 0.3s ease;
+    }
+
+    .action-buttons a {
+        background-color: #ff9800;
+    }
+
+    .action-buttons a:hover {
+        background-color: #e68a00;
+    }
+
+    .action-buttons button {
+        background-color: #f44336;
+        border: none;
+        cursor: pointer;
+    }
+
+    .action-buttons button:hover {
+        background-color: #d32f2f;
+    }
+</style>
+
+<h2>Welcome to the Speech Therapy Dashboard</h2>
+<p>Manage patients and view therapy progress.</p>
+
+<h3>Our Patients</h3>
+<div class="patient-container">
+    {% for patient in patients %}
+    <div class="patient-card">
+        <p class="name">{{ patient.name }}</p>
+        <p>Age: {{ patient.age }}</p>
+        <p>Gender: {{ patient.gender }}</p>
+        <p>Email: {{ patient.email }}</p>
+
+        <div class="action-buttons">
+            <a href="/patient/{{ patient.id }}">View Details</a>
+            <form action="{% url 'delete_patient' patient.id %}" method="post" onsubmit="return confirm('Are you sure you want to delete this patient?');">
+                {% csrf_token %}
+                <button type="submit">Delete Patient</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

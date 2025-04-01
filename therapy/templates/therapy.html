@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% block title %}Therapy{% endblock %}
+{% block content %}
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #1e1e1e;
+        color: #ffffff;
+    }
+
+    h2 {
+        text-align: center;
+        color: #ff9800;
+        margin-bottom: 30px;
+        font-size: 2rem;
+    }
+
+    form {
+        max-width: 600px;
+        margin: auto;
+        background: #333333;
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    label {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #ff9800;
+        margin-bottom: 5px;
+        display: block;
+    }
+
+    input[type="email"],
+    input[type="file"],
+    button {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1rem;
+        background: #444444;
+        color: #ffffff;
+    }
+
+    input:focus,
+    button:focus {
+        border-color: #ff9800;
+        outline: none;
+        box-shadow: 0 0 5px rgba(255, 152, 0, 0.8);
+    }
+
+    button {
+        background-color: #ff9800;
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+        background-color: #e68a00;
+    }
+
+    .audio-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .audio-controls button {
+        flex: 1;
+        margin: 0 5px;
+        padding: 10px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 5px;
+        color: #ffffff;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .audio-controls button#startRecording {
+        background-color: #4caf50;
+    }
+
+    .audio-controls button#startRecording:hover {
+        background-color: #45a049;
+    }
+
+    .audio-controls button#stopRecording {
+        background-color: #f44336;
+    }
+
+    .audio-controls button#stopRecording:hover {
+        background-color: #e53935;
+    }
+
+    .audio-controls button#playRecording {
+        background-color: #ff9800;
+    }
+
+    .audio-controls button#playRecording:hover {
+        background-color: #e68a00;
+    }
+
+    canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin: 20px 0;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        background-color: #121212;
+    }
+
+    #results {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    #results p {
+        font-size: 1rem;
+        margin: 10px 0;
+    }
+
+    #results p.success {
+        color: green;
+    }
+
+    #results p.error {
+        color: red;
+    }
+</style>
+
+<h2>Therapy Session</h2>
+<form id="therapyForm" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <label for="email">Enter your Email:</label>
+    <input type="email" id="email" name="email" required>
+
+    <label for="audio">Upload Pre-recorded Audio:</label>
+    <input type="file" id="audio" name="audio_file">
+
+    <h3 style="color: #ff9800; text-align: center;">Or Record Live Audio</h3>
+    <div class="audio-controls">
+        <button type="button" id="startRecording">Start Recording</button>
+        <button type="button" id="stopRecording" disabled>Stop Recording</button>
+        <button type="button" id="playRecording" disabled>Play Recording</button>
+    </div>
+
+    <canvas id="audioVisualizer"></canvas>
+    
+    <input type="hidden" id="recordedAudio" name="recordedAudio">
+
+    <button type="submit">Analyze</button>
+</form>
+
+<div id="results">
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+    
+    {% if success %}
+    <div style="margin-top: 20px; padding: 15px; background: #444444; border-radius: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);">
+        <p style="color: #4caf50; font-weight: bold; font-size: 1.2rem; margin-bottom: 10px;">{{ success }}</p>
+        <p style="color: #ff9800; font-size: 1rem; margin: 5px 0;">Word Accuracy: <span style="color: #ffffff;">{{ word_accuracy }}%</span></p>
+        <p style="color: #ff9800; font-size: 1rem; margin: 5px 0;">Character Accuracy: <span style="color: #ffffff;">{{ char_accuracy }}%</span></p>
+    </div>
+    {% endif %}
+</div>
+
+
+<script>
+    let audioContext, analyser, microphone, javascriptNode, mediaRecorder;
+    let audioChunks = [];
+    const startButton = document.getElementById('startRecording');
+    const stopButton = document.getElementById('stopRecording');
+    const playButton = document.getElementById('playRecording');
+    const recordedAudioField = document.getElementById('recordedAudio');
+    const audioVisualizer = document.getElementById('audioVisualizer');
+    const canvasContext = audioVisualizer.getContext('2d');
+    let recordingBlob = null;
+
+    startButton.addEventListener('click', async () => {
+        audioChunks = [];
+        recordingBlob = null;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(stream);
+            mediaRecorder = new MediaRecorder(stream);
+
+            microphone.connect(analyser);
+            analyser.fftSize = 256;
+
+            javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+            analyser.connect(javascriptNode);
+            javascriptNode.connect(audioContext.destination);
+
+            javascriptNode.onaudioprocess = () => {
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+
+                canvasContext.clearRect(0, 0, audioVisualizer.width, audioVisualizer.height);
+                canvasContext.fillStyle = '#121212';
+                canvasContext.fillRect(0, 0, audioVisualizer.width, audioVisualizer.height);
+
+                const barWidth = (audioVisualizer.width / dataArray.length) * 2.5;
+                let barHeight;
+                let x = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    barHeight = dataArray[i] / 2;
+                    canvasContext.fillStyle = `rgb(${barHeight + 100}, 50, 50)`;
+                    canvasContext.fillRect(x, audioVisualizer.height - barHeight, barWidth, barHeight);
+                    x += barWidth + 1;
+                }
+            };
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                recordingBlob = new Blob(audioChunks, { type: 'audio/wav' });
+
+                const reader = new FileReader();
+                reader.readAsDataURL(recordingBlob);
+                reader.onloadend = () => {
+                    recordedAudioField.value = reader.result;
+                };
+
+                playButton.disabled = false;
+            };
+
+            mediaRecorder.start();
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+        }
+    });
+
+    stopButton.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            startButton.disabled = false;
+            stopButton.disabled = true;
+        }
+    });
+
+    playButton.addEventListener('click', () => {
+        if (recordingBlob) {
+            const audioUrl = URL.createObjectURL(recordingBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+        }
+    });
+</script>
+
+{% endblock %}
